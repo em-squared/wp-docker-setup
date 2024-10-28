@@ -1,0 +1,66 @@
+services:
+  wordpress:
+    image: wordpress:latest
+    ports:
+      - "8000:80"
+    environment:
+      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
+    volumes:
+      - ./src:/var/www/html
+      # - ./uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
+    depends_on:
+      - db
+    user: "${UID}:${GID}"
+
+  db:
+    image: mysql:5.7
+    environment:
+      MYSQL_DATABASE: ${WORDPRESS_DB_NAME}
+      MYSQL_USER: ${WORDPRESS_DB_USER}
+      MYSQL_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      MYSQL_RANDOM_ROOT_PASSWORD: "1"
+    volumes:
+      - db_data:/var/lib/mysql
+
+  adminer:
+    image: adminer
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+
+  wp-cli:
+    image: wordpress:cli
+    volumes:
+      - ./src:/var/www/html
+    depends_on:
+      - wordpress
+      - db
+    user: "${UID}:${GID}"
+
+  phpunit:
+    image: wordpress:cli
+    volumes:
+      - ./src/tests:/var/www/html/tests
+    depends_on:
+      - wordpress
+      - db
+    user: "${UID}:${GID}"
+    command: >
+      /bin/sh -c "
+        wp core install --path=/var/www/html --url=http://localhost:8000 --title=Test --admin_user=admin --admin_password=password --admin_email=admin@example.com --skip-email;
+        wp plugin activate --all;
+        phpunit -c /var/www/html/wp-content/plugins/your-plugin/phpunit.xml
+      "
+
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+volumes:
+  db_data:
